@@ -1,0 +1,12 @@
+WITH RECURSIVE cte as 
+(
+  SELECT 2 AS nums
+  union all
+  SELECT nums+1 FROM cte
+  WHERE nums<100
+)
+SELECT STRING_AGG(CAST(nums AS STRING) order by nums) FROM CTE
+WHERE nums NOT IN (
+SELECT distinct a.nums FROM cte a
+INNER JOIN cte b ON a.nums!=b.nums and mod(a.nums,b.nums)=0
+)
