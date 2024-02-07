@@ -26,6 +26,5 @@ SELECT date(snapshot_date) as snapshot_date ,COALESCE(LEAD(date(snapshot_date),1
 
 --select * from cte_1
 select fp.date,cte_1.snapshot_date--, cte_1.prev_snapshot_date 
-from `ite-aia-datalake.it_dm.tb_pipe_fiscal_periods` fp
 inner join cte_1 on fp.date>= cte_1.snapshot_date and fp.date<cte_1.prev_snapshot_date
 order by 1
