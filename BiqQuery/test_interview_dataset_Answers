@@ -1,0 +1,299 @@
+--1.How many and how much (balance) new loans were there in March?
+SELECT *
+--COUNT(DISTINCT loan_id) 
+FROM `northern-saga-447619-r8.interview.interview_data` a 
+WHERE calendar_day BETWEEN '2023-03-01' AND '2023-03-31'
+AND NOT EXISTS ( SELECT 1 FROM `northern-saga-447619-r8.interview.interview_data` b WHERE a.loan_id = b.loan_id AND b.calendar_day<'2023-03-01')
+;
+
+--2 Using the reference table of FICO score buckets
+WITH fico AS 
+(
+  SELECT 800 AS min_fico , 900 max_fico, 2 as bucket
+  UNION ALL
+  SELECT 700 AS min_fico , 799 max_fico, 3 as bucket
+  UNION ALL
+  SELECT 600 AS min_fico , 699 max_fico, 4 as bucket
+  UNION ALL
+  SELECT 300 AS min_fico , 599 max_fico, 5 as bucket
+  
+)
+,new_loans AS 
+(
+  SELECT c.min_fico,c.max_fico,c.bucket,SUM(balance) AS new_loan_balance
+--COUNT(DISTINCT loan_id) 
+  FROM `northern-saga-447619-r8.interview.interview_data` a
+  LEFT JOIN fico c ON a.fico BETWEEN c.min_fico AND c.max_fico 
+  WHERE calendar_day BETWEEN '2023-03-01' AND '2023-03-31'
+  AND NOT EXiSTS ( SELECT 1 FROM `northern-saga-447619-r8.interview.interview_data` b WHERE a.loan_id = b.loan_id AND b.calendar_day<'2023-03-01')
+  GROUP BY ALL
+)
+,entire_population AS 
+(
+  SELECT c.min_fico,c.max_fico,c.bucket,SUM(balance) AS entire_march_balance
+--COUNT(DISTINCT loan_id) 
+  FROM `northern-saga-447619-r8.interview.interview_data` a
+  LEFT JOIN fico c ON a.fico BETWEEN c.min_fico AND c.max_fico 
+  WHERE calendar_day BETWEEN '2023-03-01' AND '2023-03-31'
+  --AND NOT EXiSTS ( SELECT 1 FROM `northern-saga-447619-r8.interview.interview_data` b WHERE a.loan_id = b.loan_id AND b.calendar_day<'2023-03-01')
+  GROUP BY ALL
+
+)
+SELECT a.*,b.entire_march_balance FROM new_loans a
+LEFT JOIN entire_population b ON a.bucket = b.bucket
+;
+
+--3.How many loans are 30+ days delinquent (dunning >= 05 and impaired = 0) in each month?
+
+SELECT FORMAT_DATE('%B-%Y',calendar_day),COUNT(DISTINCT loan_id) loans FROM `northern-saga-447619-r8.interview.interview_data` 
+WHERE dunning>5 AND impaired=0
+GROUP BY 1;
+
+
+--4.How much balance was newly impaired (impaired = 1 in March and impaired = 0 in December) in March?
+SELECT 
+SUM(CASE WHEN impaired=1
+AND calendar_day BETWEEN '2023-03-01' AND '2023-03-31' THEN balance END )
+-
+SUM(CASE WHEN impaired=0
+AND calendar_day BETWEEN '2022-12-01' AND '2022-12-31' THEN balance END ) impaired_balance
+
+--5. What were the largest 10 loans at each quarter end
+
+SELECT *
+--,DENSE_RANK()OVER(PARTITION BY calendar_day ORDER BY balance DESC ) ranking
+FROM 
+(
+  SELECT calendar_day,loan_id,SUM(balance) AS balance FROM  `northern-saga-447619-r8.interview.interview_data`
+WHERE calendar_day = LAST_DAY(calendar_day,QUARTER)
+GROUP BY ALL
+)
+QUALIFY 10>=DENSE_RANK()OVER(PARTITION BY calendar_day ORDER BY balance DESC )
+
+
+
+
+
+Code Review issues:
+1. calendar_day = "2023-12-31" which should be calendar_day = "2022-12-31"
+2. use coalesce function in the substract 
+
+
+
+New code:
+WITH
+`december` AS (select
+SUM(t.balance) AS b FROM `northern-saga-447619-r8.interview.interview_data` t
+WHERE calendar_day = "2022-12-31" AND t.impaired=1),
+march AS (select SUM(balance) b,from `northern-saga-447619-r8.interview.interview_data` WHERE
+calendar_day="2023-03-31" AND impaired > 0
+) select
+t1.b as current_imp,t2.b AS prev_imp,
+COALESCE(t1.b,0) -COALESCE(t2.b,0) as change_imp,
+FROM
+-- Horizontally combine the rows
+`march` AS t1 JOIN `december` AS t2 on true;
+FROM `northern-saga-447619-r8.interview.interview_data` 
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------second PDF
+
+1. 
+with accounts AS (
+SELECT '11111' AS account_id,'2023-09-30' AS calendar_day,50000 AS transaction_amount
+UNION ALL
+SELECT '11111','2023-10-31',-800
+UNION ALL
+SELECT '11111','2023-11-30',-800
+UNION ALL
+SELECT '11111','2023-12-31',-800
+UNION ALL
+SELECT '11111','2024-01-31',-800
+UNION ALL
+SELECT '11111','2024-02-29',-800
+UNION ALL
+SELECT '11111','2024-03-31',-800
+
+)
+SELECT * FROM 
+(
+SELECT account_id,calendar_day,SUM(transaction_amount) OVER(ORDER BY calendar_day) FROM accounts
+)
+where calendar_day='2024-03-31'
+;
+
+
+2.
+
+with accounts AS (
+SELECT '11111' AS account_id,'2023-09-30' AS calendar_day,50000 AS transaction_amount
+UNION ALL
+SELECT '11111','2023-10-31',-800
+UNION ALL
+SELECT '11111','2023-11-30',-800
+UNION ALL
+SELECT '11111','2023-12-31',-800
+UNION ALL
+SELECT '11111','2024-01-31',-800
+UNION ALL
+SELECT '11111','2024-02-29',-800
+UNION ALL
+SELECT '11111','2024-03-31',-800
+
+)
+SELECT * FROM 
+(
+SELECT account_id,calendar_day,SUM(transaction_amount) OVER(ORDER BY calendar_day) FROM accounts
+)
+--where calendar_day='2024-03-31'
+;
+
+3.
+
+with accounts AS (
+SELECT '11111' AS account_id,5 as product_group
+UNION ALL
+SELECT '22222' AS account_id,10 as product_group
+UNION ALL
+SELECT '33333' AS account_id,15 as product_group
+UNION ALL
+SELECT '44444' AS account_id,20 as product_group
+UNION ALL
+SELECT '55555' AS account_id,25 as product_group
+
+
+)
+SELECT *,
+CASE WHEN product_group=5 THEN 'business'
+     WHEN product_group=10 THEN 'personal'
+     WHEN product_group=15 THEN 'wealth'
+     ELSE 'other' END AS account_type
+
+FROM accounts
+
+
+;
+
+4.
+
+with accounts AS (
+SELECT '11111' AS account_id,5 as product_group,2500 AS account_balance
+UNION ALL
+SELECT '22222' AS account_id,10 as product_group,1500 AS account_balance
+UNION ALL
+SELECT '33333' AS account_id,15 as product_group,2000 AS account_balance
+UNION ALL
+SELECT '44444' AS account_id,20 as product_group,1500 AS account_balance
+UNION ALL
+SELECT '55555' AS account_id,25 as product_group,1800 AS account_balance
+
+
+)
+SELECT 
+CASE WHEN product_group=5 THEN 'business'
+     WHEN product_group=10 THEN 'personal'
+     WHEN product_group=15 THEN 'wealth'
+     ELSE 'other' END AS account_type,
+SUM(account_balance) as account_balance
+FROM accounts
+GROUP BY ALL
+
+;
+
+5.
+with accounts AS (
+SELECT '11111' AS account_id,'2023-09-30' AS calendar_day,'business' AS account_type
+UNION ALL
+SELECT '11111','2023-10-31',NULL
+UNION ALL
+SELECT '11111','2023-11-30',NULL
+UNION ALL
+SELECT '11111','2023-12-31','personal'
+UNION ALL
+SELECT '11111','2024-01-31','personal'
+UNION ALL
+SELECT '11111','2024-02-29',NULL
+UNION ALL
+SELECT '11111','2024-03-31',NULL
+
+)
+
+SELECT *,last_value(account_type ignore nulls)OVER(PARTITION BY account_id ORDER BY calendar_day 
+rows between unbounded preceding and current row) FROM accounts
+;
+
+5. a
+
+with accounts AS (
+SELECT '11111' AS account_id,'2023-09-30' AS calendar_day,'business' AS account_type
+UNION ALL
+SELECT '11111','2023-10-31',NULL
+UNION ALL
+SELECT '11111','2023-11-30',NULL
+UNION ALL
+SELECT '11111','2023-12-31','personal'
+UNION ALL
+SELECT '11111','2024-01-31','personal'
+UNION ALL
+SELECT '11111','2024-02-29',NULL
+UNION ALL
+SELECT '11111','2024-03-31',NULL
+
+)
+
+SELECT account_id,account_type_adjusted
+,MIN(calendar_day)AS row_effective_from --OVER(PARTITION BY account_id,account_type_adjusted ORDER BY calendar_day )
+,MAX(calendar_day) AS row_effective_to --OVER(PARTITION BY account_id,account_type_adjusted)
+FROM
+(
+  SELECT *,last_value(account_type ignore nulls)OVER(PARTITION BY account_id ORDER BY calendar_day 
+rows between unbounded preceding and current row)AS account_type_adjusted
+ FROM accounts
+) 
+GROUP BY ALL
+
+;
+
+6
+
+with table_group AS (
+SELECT 'g111' AS group_id,'2023-09-30' AS calendar_day,'m111' AS member_id,'yes' is_primary,200 as rating,'2022-10-15' AS rated_on
+UNION ALL SELECT 'g111','2023-09-30','m222','no',185,'2023-05-31'
+UNION ALL SELECT 'g111','2023-09-30','m333','no',190,'2023-06-20'
+UNION ALL SELECT 'g111','2023-10-31','m111','yes',200,'2022-10-15'
+UNION ALL SELECT 'g111','2023-10-31','m222','no',185,'2023-05-31'
+UNION ALL SELECT 'g111','2023-10-31','m333','no',190,'2023-06-20'
+UNION ALL SELECT 'g111','2023-11-30','m111','yes',200,'2022-10-15'
+UNION ALL SELECT 'g111','2023-11-30','m222','no',185,'2023-05-31'
+UNION ALL SELECT 'g111','2023-11-30','m333','no',190,'2023-06-20'
+
+)
+,cte_1 AS (
+SELECT *
+,DATE_DIFF(DATE(calendar_day), DATE(rated_on), DAY) condition_1
+,CASE WHEN DATE_DIFF(DATE(calendar_day), DATE(rated_on), DAY)<=365 then 'yes' ELSE 'no'  END is_valid
+FROM table_group
+),
+cte_2 AS 
+(
+  SELECT group_id,calendar_day,member_id,rating,rated_on FROM cte_1
+WHERE is_primary='yes' AND is_valid='yes'
+)
+--SELECT * FROM cte_1
+SELECT group_id,calendar_day,member_id,rating,rated_on FROM cte_2
+--WHERE is_primary='yes' AND is_valid='yes'
+UNION ALL
+SELECT group_id,calendar_day,member_id,rating,rated_on FROM cte_1 a
+WHERE is_primary='no'
+AND NOT EXISTS ( SELECT 1 FROM cte_2 b WHERE a.group_id = b.group_id AND a.calendar_day = b.calendar_day)
+QUALIFY 1= ROW_NUMBER()OVER(PARTITION BY group_id,calendar_day ORDER BY rating)
+
+
