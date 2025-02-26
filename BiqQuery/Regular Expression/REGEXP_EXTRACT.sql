@@ -1,3 +1,4 @@
+--https://www.youtube.com/watch?v=k8AznxLnpgA
 SELECT province_state,country_region,combined_key,
 REGEXP_EXTRACT(combined_key,r"^[^,]*") AS city -- starting with any number of characters except , 
 -- It will pull entire substring till it find , 
