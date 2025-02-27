@@ -18,6 +18,7 @@ SELECT col_value
 ,REGEXP_EXTRACT(col_value,r"student_number:\s.*") student_number_after 
 -- starting from student_number string with any number of characters except student_number: text 
 -- when ever we have used () it will behave like capturing group (submatch)
+-- After the entire match, It will remove student_number:
 ,REGEXP_EXTRACT(col_value,r"student_number:\s(.*)") student_number_after_without_text
 -- starting from student_number string with any number of characters except student_number: text 
 -- when ever we have used () it will behave like capturing group (submatch)
