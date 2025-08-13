@@ -1,4 +1,21 @@
 --https://www.youtube.com/watch?v=k8AznxLnpgA
+
+[^,] - any character except comma
++ - one or more times
+() - captures this part as group 1
+
+Ex: REGEXP_EXTRACT(features_inuse_no,r'(?)ENCRYPTION:([^,]+)')
+How it executes:
+
+  Searches for the literal text "ENCRYPTION:"
+  Captures everything after it until it hits a comma or end of string
+  Returns only the captured group (the part in parentheses)
+
+SELECT REGEXP_EXTRACT('ENCRYPTION:true,COMPRESSION:false', r'ENCRYPTION:([^,]+)') as result
+  returns true
+
+
+
 SELECT province_state,country_region,combined_key,
 REGEXP_EXTRACT(combined_key,r"^[^,]*") AS city -- starting with any number of characters except , 
 -- It will pull entire substring till it find , 
@@ -29,4 +46,6 @@ SELECT col_value
 FROM cte
 
 ;
+
+
 
